@@ -1,0 +1,11 @@
+subscription_id = "00000000-0000-0000-0000-000000000000"
+
+# 接続元のグローバル IP に置き換える
+allowed_cidrs = ["203.0.113.10/32"]
+
+# zabbix_server の prefix を変更した場合は同じ値を指定する
+# zabbix_server_prefix = "zabbix-test"
+
+# prefix        = "windows-web"
+# computer_name = "win-web01"
+# vm_size       = "Standard_D2s_v5"

@@ -1,0 +1,107 @@
+#!/bin/bash
+# RHEL 10 上に Zabbix 8.0 (Apache + PHP-FPM + PostgreSQL) を構築する初回起動スクリプト。
+# 実行ログ: /var/log/cloud-init-output.log
+set -euo pipefail
+
+readonly DATA_DISK_LUN=0
+readonly PGSQL_MOUNT=/var/lib/pgsql
+readonly FRONTEND_CONF=/etc/zabbix/web/zabbix.conf.php
+
+timedatectl set-timezone "${timezone}"
+
+# --- データディスクの準備 -------------------------------------------------------
+# ディスクは VM 作成後にアタッチされるため、認識されるまで待つ
+disk=""
+for _ in $(seq 1 60); do
+  for candidate in "/dev/disk/azure/scsi1/lun$DATA_DISK_LUN" "/dev/disk/azure/data/by-lun/$DATA_DISK_LUN"; do
+    if [ -e "$candidate" ]; then
+      disk=$(readlink -f "$candidate")
+      break 2
+    fi
+  done
+  sleep 10
+done
+if [ -z "$disk" ]; then
+  echo "ERROR: data disk at LUN $DATA_DISK_LUN was not found" >&2
+  exit 1
+fi
+
+# 既存データを消さないよう、ファイルシステムが無い場合のみフォーマットする
+if ! blkid "$disk" >/dev/null 2>&1; then
+  mkfs.xfs "$disk"
+  udevadm settle
+fi
+uuid=$(blkid -s UUID -o value "$disk")
+
+mkdir -p "$PGSQL_MOUNT"
+echo "UUID=$uuid $PGSQL_MOUNT xfs defaults,nofail 0 2" >> /etc/fstab
+systemctl daemon-reload
+mount "$PGSQL_MOUNT"
+
+# --- パッケージのインストール ---------------------------------------------------
+rpm -Uvh https://repo.zabbix.com/zabbix/8.0/release/rhel/10/noarch/zabbix-release-latest-8.0.el10.noarch.rpm
+dnf clean all
+dnf install -y \
+  postgresql-server \
+  zabbix-server-pgsql \
+  zabbix-web-pgsql \
+  zabbix-apache-conf \
+  zabbix-sql-scripts \
+  zabbix-selinux-policy \
+  zabbix-agent
+
+# --- PostgreSQL の初期化 --------------------------------------------------------
+chown postgres:postgres "$PGSQL_MOUNT"
+chmod 700 "$PGSQL_MOUNT"
+restorecon -R "$PGSQL_MOUNT"
+postgresql-setup --initdb
+
+# Zabbix サーバは UNIX ソケット(peer 認証)で接続するためパスワードを持たない。
+# フロントエンド(apache ユーザー)のみ TCP + パスワードで接続する。
+pg_hba="$PGSQL_MOUNT/data/pg_hba.conf"
+sed -i '1i host zabbix zabbix ::1/128 scram-sha-256' "$pg_hba"
+sed -i '1i host zabbix zabbix 127.0.0.1/32 scram-sha-256' "$pg_hba"
+
+systemctl enable --now postgresql
+
+# --- Zabbix データベースの作成 ---------------------------------------------------
+# パスワードは VM 内で生成し、Terraform の state やカスタムデータに残さない
+db_password=$(openssl rand -hex 24)
+
+cd /tmp
+runuser -u postgres -- psql -q -v ON_ERROR_STOP=1 <<SQL
+CREATE ROLE zabbix LOGIN PASSWORD '$db_password';
+SQL
+runuser -u postgres -- createdb -O zabbix -E Unicode -T template0 zabbix
+zcat /usr/share/zabbix/sql-scripts/postgresql/server.sql.gz \
+  | runuser -u zabbix -- psql -q -v ON_ERROR_STOP=1 zabbix >/dev/null
+
+# --- フロントエンドの設定(セットアップウィザードを省略) ---------------------------
+install -m 0640 -o root -g apache /dev/null "$FRONTEND_CONF"
+sed \
+  -e "s/^\$DB\['TYPE'\].*/\$DB['TYPE'] = 'POSTGRESQL';/" \
+  -e "s/^\$DB\['SERVER'\].*/\$DB['SERVER'] = 'localhost';/" \
+  -e "s/^\$DB\['PASSWORD'\].*/\$DB['PASSWORD'] = '$db_password';/" \
+  /usr/share/zabbix/ui/conf/zabbix.conf.php.example > "$FRONTEND_CONF"
+restorecon "$FRONTEND_CONF"
+
+echo "php_value[date.timezone] = ${timezone}" >> /etc/php-fpm.d/zabbix.conf
+
+# --- SELinux / ファイアウォール --------------------------------------------------
+setsebool -P httpd_can_network_connect_db on
+# この boolean は Zabbix のポリシーパッケージではなく OS 側のポリシーで定義される
+setsebool -P httpd_can_connect_zabbix on || echo "WARNING: failed to set httpd_can_connect_zabbix" >&2
+
+if systemctl is-active --quiet firewalld; then
+  firewall-cmd --permanent --add-service=http --add-port=10051/tcp
+  firewall-cmd --reload
+fi
+
+# --- サービスの起動と確認 --------------------------------------------------------
+systemctl enable --now zabbix-server zabbix-agent php-fpm httpd
+
+sleep 10
+systemctl is-active zabbix-server zabbix-agent php-fpm httpd
+curl -fsS -o /dev/null http://localhost/zabbix/index.php
+
+echo "Zabbix bootstrap completed"

@@ -1,0 +1,14 @@
+subscription_id     = "00000000-0000-0000-0000-000000000000"
+ssh_public_key_path = "~/.ssh/id_rsa.pub"
+
+# 接続元のグローバル IP に置き換える
+allowed_cidrs = ["203.0.113.10/32"]
+
+# アクティブエージェントから接続を受ける場合に指定する
+# agent_cidrs = ["198.51.100.0/24"]
+
+# location                  = "japaneast"
+# prefix                    = "zabbix-test"
+# vm_size                   = "Standard_D2s_v5"
+# disk_storage_account_type = "StandardSSD_LRS"
+# data_disk_size_gb         = 128

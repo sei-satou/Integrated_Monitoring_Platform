@@ -1,0 +1,31 @@
+# Sets up IIS and the Zabbix agent on the first boot. SQL Server comes with the image.
+# Keep this file ASCII only: Windows PowerShell 5.1 does not read BOM-less files as UTF-8.
+$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+
+Install-WindowsFeature -Name Web-Server -IncludeManagementTools | Out-Null
+
+Start-Service -Name 'MSSQLSERVER'
+(Get-Service -Name 'MSSQLSERVER').WaitForStatus('Running', [TimeSpan]::FromMinutes(5))
+
+$msiPath = Join-Path $env:TEMP 'zabbix_agent.msi'
+Invoke-WebRequest -UseBasicParsing -OutFile $msiPath -Uri 'https://cdn.zabbix.com/zabbix/binaries/stable/8.0/${zabbix_agent_version}/zabbix_agent-${zabbix_agent_version}-windows-amd64-openssl.msi'
+
+$msiArguments = @(
+    '/i', $msiPath,
+    '/qn', '/norestart',
+    'SERVER=${zabbix_server_ip}',
+    'SERVERACTIVE=${zabbix_server_ip}',
+    'HOSTNAME=${computer_name}'
+)
+$msiProcess = Start-Process -FilePath 'msiexec.exe' -ArgumentList $msiArguments -Wait -PassThru
+if ($msiProcess.ExitCode -notin 0, 3010) {
+    throw "Zabbix agent installation failed with exit code $($msiProcess.ExitCode)"
+}
+
+New-NetFirewallRule -DisplayName 'Zabbix Agent from Zabbix Server' -Direction Inbound -Protocol TCP -LocalPort 10050 -RemoteAddress '${zabbix_server_ip}' -Action Allow | Out-Null
+
+(Get-Service -Name 'Zabbix Agent').WaitForStatus('Running', [TimeSpan]::FromMinutes(1))
+Invoke-WebRequest -UseBasicParsing -Uri 'http://localhost/' | Out-Null
+
+Write-Output 'Bootstrap completed'
