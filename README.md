@@ -103,6 +103,25 @@ terraform apply
 
 `windows_web` の構築後は、Zabbix の画面で監視対象のホストを登録してください。
 
+## リポジトリの運用ルール
+
+`main` ブランチは GitHub のルールセットで保護しています。
+
+| ルール | 設定 |
+|---|---|
+| Restrict deletions | `main` の削除を禁止 |
+| Require a pull request before merging | `main` への変更は Pull Request 経由のみ |
+| Required approvals | 1 名以上の承認が必要 |
+| Require conversation resolution before merging | レビューコメントをすべて解決してからマージ |
+| Block force pushes | 強制プッシュを禁止 |
+
+変更するときは、次の流れで進めてください。
+
+1. ブランチを作成します（書き込み権限がない場合はリポジトリを Fork します）。
+2. 変更をプッシュし、`main` に対する Pull Request を作成します。
+3. 作成者以外のレビュアーから承認を受けます。Pull Request の作成者は自分で承認できません。
+4. レビューコメントをすべて解決してからマージします。
+
 ## 注意事項
 
 - 検証環境を想定した構成です。Zabbix の画面と Windows の Web は HTTP のみで、冗長化はしていません。
