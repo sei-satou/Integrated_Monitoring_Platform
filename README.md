@@ -1,5 +1,6 @@
 # Integrated_Monitoring_Platform
 
+
 Zabbix と New Relic を組み合わせた統合監視プラットフォームの検証環境を、Azure 上に構築する Terraform コードです。
 
 1 台の Windows Web サーバを、次の 2 つの方法で同時に監視します。
