@@ -1,4 +1,4 @@
-# zabbix_test
+# zabbix_server
 
 Azure 上に Zabbix 8.0 サーバを構築する Terraform コードです。
 RHEL 10 の VM を 1 台作成し、初回起動時のスクリプトで Apache + PHP-FPM + PostgreSQL + Zabbix を自動でセットアップします。

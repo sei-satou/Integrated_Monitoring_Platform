@@ -1,0 +1,12 @@
+subscription_id      = "00000000-0000-0000-0000-000000000000"
+newrelic_account_id  = 1234567
+newrelic_api_key     = "<NEW_RELIC_USER_KEY>"
+newrelic_license_key = "<NEW_RELIC_LICENSE_KEY>"
+
+# アカウントのデータセンターに合わせて US / EU / JP を指定する
+# newrelic_region = "US"
+
+# windows_web の prefix を変更した場合は同じ値を指定する
+# windows_web_prefix = "windows-web"
+
+# synthetics_period = "EVERY_5_MINUTES"

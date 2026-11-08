@@ -15,7 +15,7 @@ Zabbix の監視対象となる Windows の Web サーバを Azure 上に構築�
 | 監視 | Zabbix エージェント 8.0 |
 | ネットワーク | Zabbix サーバの VNet に専用サブネットを追加（既定は `10.10.2.0/24`） |
 
-RDP と HTTP は `allowed_cidrs` からのみ許可します。Zabbix の通信は VNet 内のプライベート IP で行います。SQL Server への外部接続は開けていません。
+RDP と HTTP は `allowed_cidrs` からのみ許可します。Zabbix の通信は VNet 内のプライベート IP で行います。SQL Server への外部接続は開けていません。[newrelic_monitoring](../newrelic_monitoring/) をデプロイすると、New Relic の監視元からの HTTP も許可されます。
 
 ## 前提条件
 

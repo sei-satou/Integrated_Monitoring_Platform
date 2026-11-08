@@ -34,30 +34,35 @@ resource "azurerm_network_security_group" "this" {
   location            = azurerm_resource_group.this.location
   resource_group_name = azurerm_resource_group.this.name
   tags                = var.tags
+}
 
-  security_rule {
-    name                       = "allow-rdp"
-    priority                   = 100
-    direction                  = "Inbound"
-    access                     = "Allow"
-    protocol                   = "Tcp"
-    source_port_range          = "*"
-    destination_port_range     = "3389"
-    source_address_prefixes    = var.allowed_cidrs
-    destination_address_prefix = "*"
-  }
+# newrelic_monitoring からこの NSG にルールを追加するため、インラインではなく個別リソースで定義する
+resource "azurerm_network_security_rule" "allow_rdp" {
+  name                        = "allow-rdp"
+  resource_group_name         = azurerm_resource_group.this.name
+  network_security_group_name = azurerm_network_security_group.this.name
+  priority                    = 100
+  direction                   = "Inbound"
+  access                      = "Allow"
+  protocol                    = "Tcp"
+  source_port_range           = "*"
+  destination_port_range      = "3389"
+  source_address_prefixes     = var.allowed_cidrs
+  destination_address_prefix  = "*"
+}
 
-  security_rule {
-    name                       = "allow-http"
-    priority                   = 110
-    direction                  = "Inbound"
-    access                     = "Allow"
-    protocol                   = "Tcp"
-    source_port_range          = "*"
-    destination_port_range     = "80"
-    source_address_prefixes    = var.allowed_cidrs
-    destination_address_prefix = "*"
-  }
+resource "azurerm_network_security_rule" "allow_http" {
+  name                        = "allow-http"
+  resource_group_name         = azurerm_resource_group.this.name
+  network_security_group_name = azurerm_network_security_group.this.name
+  priority                    = 110
+  direction                   = "Inbound"
+  access                      = "Allow"
+  protocol                    = "Tcp"
+  source_port_range           = "*"
+  destination_port_range      = "80"
+  source_address_prefixes     = var.allowed_cidrs
+  destination_address_prefix  = "*"
 }
 
 resource "azurerm_subnet_network_security_group_association" "this" {
